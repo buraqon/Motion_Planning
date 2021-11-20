@@ -26,18 +26,54 @@ class vertex:
 		row_tot = self.total_rows
 		col_tot = self.total_cols
 
-		if row < row_tot-1 and not grid[row+1][col].value>=90:
+		# Corners
+
+		if row < row_tot-1 and col < col_tot-1 and not grid[row+1][col+1].value==1:
+			self.neighbors.append(grid[row+1][col+1])
+
+		if row > 0 and col > 0 and not grid[row-1][col-1].value==1:
+			self.neighbors.append(grid[row-1][col-1])
+
+		if row < row_tot-1 and col > 0  and not grid[row+1][col-1].value==1:
+			self.neighbors.append(grid[row+1][col-1])
+
+		if row > 0 and col < col_tot-1 and not grid[row-1][col+1].value==1:
+			self.neighbors.append(grid[row-1][col+1])
+
+		# Horizontal, Vertical
+
+		if row < row_tot-1 and not grid[row+1][col].value==1:
 			self.neighbors.append(grid[row+1][col])
 
-		if row > 0 and not grid[row-1][col].value>=90:
+		if row > 0 and not grid[row-1][col].value==1:
 			self.neighbors.append(grid[row-1][col])
 
-		if col < col_tot-1 and not grid[row][col+1].value>=90:
+		if col < col_tot-1 and not grid[row][col+1].value==1:
 			self.neighbors.append(grid[row][col+1])
 
-		if col > 0 and not grid[row][col-1].value>=90:
+		if col > 0 and not grid[row][col-1].value==1:
 			self.neighbors.append(grid[row][col-1])
 
+def read_image():
+	img = cv2.imread("test_map2.jpg", 0)
+
+
+	#cv2.imshow('image', img)
+	#cv2.waitKey(0)
+	#cv2.destroyAllWindows()
+	return img
+
+def make_grid(rows, cols, occ_grid):
+	grid = []
+	for i in range(rows):
+		grid.append([])
+		for j in range(cols):
+			if(occ_grid[i][j]>=90):
+				spot = vertex(i, j, rows, cols, 1) # 1 for barrrier
+			else:
+				spot = vertex(i, j, rows, cols, 0) # 0 for free space
+			grid[i].append(spot)
+	return grid
 
 def h(p1, p2):
 	x1, y1 = p1
@@ -46,12 +82,10 @@ def h(p1, p2):
 
 ## we are going to work on this part to make it work on our code...
 
-def reconstruct_path(came_from, current, draw):
+def reconstruct_path(came_from, current):
 	while current in came_from:
 		current = came_from[current]
-		current.make_path()
-		draw()
-
+		current.value = 4 # 4 for path
 
 def algorithm(grid, start, end):
 	count = 0
@@ -65,18 +99,14 @@ def algorithm(grid, start, end):
 
 	open_set_hash = {start}
 
-	while not open_set.empty():
-		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				pygame.quit()
 
+	while not open_set.empty():
 		current = open_set.get()[2]
 		open_set_hash.remove(current)
 
 		if current == end:
 			reconstruct_path(came_from, end)
-			end.make_end()
-			return True
+			return True, came_from
 
 		for neighbor in current.neighbors:
 			temp_g_score = g_score[current] + 1
@@ -89,93 +119,34 @@ def algorithm(grid, start, end):
 					count += 1
 					open_set.put((f_score[neighbor], count, neighbor))
 					open_set_hash.add(neighbor)
-					neighbor.make_open()
+					#neighbor.make_open()
+					neighbor.value = 2 # 2 for open
 		if current != start:
-			current.make_closed()
+			current.value = 3 # 3 for closed
 
-	return False
+	return False, came_from
 
+# TESTING
 
-def make_grid(rows, cols, occ_grid):
-	grid = []
+def Astar(occ_grid, x1,y1, x2, y2):
+	#occ_grid = read_image() # For testing only
+
+	rows = occ_grid.shape[0]
+	cols = occ_grid.shape[1]
+	grid = make_grid(rows, cols, occ_grid)
 	for i in range(rows):
-		grid.append([])
 		for j in range(cols):
-			spot = vertex(i, j, rows, cols, occ_grid[i][j])
-			grid[i].append(spot)
-	return grid
-
-def read_image():
-	img = cv2.imread("test_map.jpg", 0)
-	#cv2.imshow('image', img)
-	#cv2.waitKey(0)
-	#cv2.destroyAllWindows()
-	return img
+			grid[i][j].update_neighbors(grid)
 
 
-occ_grid = read_image()
-print(np.unique(occ_grid))
-rows = occ_grid.shape[0]
-cols = occ_grid.shape[1]
-grid = make_grid(rows, cols, occ_grid)
-for i in range(rows):
-	for j in range(cols):
-		grid[i][j].update_neighbors(grid)
+	cond, came_from = algorithm(grid, grid[x1][y1], grid[x2][y2])
 
 
+	for c in came_from:
+		if(c.value ==4):
+			occ_grid[c.row][c.col] = 240
 
-# def main(win, width):
-# 	ROWS = 10
-# 	grid = make_grid(ROWS, width)
+	# cv2.imshow('occ', occ_grid)
+	# cv2.waitKey(0)
 
-# 	start = None
-# 	end = None
-
-# 	run = True
-# 	while run:
-# 		draw(win, grid, ROWS, width)
-# 		for event in pygame.event.get():
-# 			if event.type == pygame.QUIT:
-# 				run = False
-
-# 			if pygame.mouse.get_pressed()[0]: # LEFT
-# 				pos = pygame.mouse.get_pos()
-# 				row, col = get_clicked_pos(pos, ROWS, width)
-# 				spot = grid[row][col]
-# 				if not start and spot != end:
-# 					start = spot
-# 					start.make_start()
-
-# 				elif not end and spot != start:
-# 					end = spot
-# 					end.make_end()
-
-# 				elif spot != end and spot != start:
-# 					spot.make_barrier()
-
-# 			elif pygame.mouse.get_pressed()[2]: # RIGHT
-# 				pos = pygame.mouse.get_pos()
-# 				row, col = get_clicked_pos(pos, ROWS, width)
-# 				spot = grid[row][col]
-# 				spot.reset()
-# 				if spot == start:
-# 					start = None
-# 				elif spot == end:
-# 					end = None
-
-# 			if event.type == pygame.KEYDOWN:
-# 				if event.key == pygame.K_SPACE and start and end:
-# 					for row in grid:
-# 						for spot in row:
-# 							spot.update_neighbors(grid)
-
-# 					algorithm(lambda: draw(win, grid, ROWS, width), grid, start, end)
-
-# 				if event.key == pygame.K_c:
-# 					start = None
-# 					end = None
-# 					grid = make_grid(ROWS, width)
-
-# 	pygame.quit()
-
-# main(WIN, WIDTH)
+	return occ_grid, came_from

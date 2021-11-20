@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+import numpy as np
 from std_msgs.msg import String
 from geometry_msgs.msg  import Twist
 from nav_msgs.msg import Odometry
@@ -7,7 +8,7 @@ from tf.transformations import euler_from_quaternion
 
 from math import sqrt, atan2, cos, sin, pi
 
-
+# Get Odometry Pose
 def get_pos(odom):
     odom_info = odom.pose.pose
     x = odom_info.position.x
@@ -54,6 +55,31 @@ def go_to_point(xt,yt,yawt,odom):
     mc = Twist()
     mc.linear.x = V
     mc.angular.z = w
+
+    # Return the movement command and a boolean to check if the order is done
     return mc, done
+
+def map_config_space(map, offset = 3):
+    map_data = np.array(map.data)
+    #print(map.info.resolution)
+    (width, height) = (map.info.width, map.info.height)
+    map_data = np.reshape(map_data, (height, width))
+    map_data = np.where(map_data >= 0, map_data, 50)
+
+    offset_arr = np.array([[1, 1],
+                           [1, -1],
+                           [-1, 1],
+                           [-1, -1]])
+
+    for i in range(map_data.shape[0]):
+        for j in range(map_data.shape[1]):
+            if(map_data[i][j] == 100):
+                for ofs in offset_arr:
+                    for k in range(offset):
+                        ofx = (k+1)*ofs[0]
+                        ofy = (k+1)*ofs[1]
+                        if(i+ofx < height and j+ofy < width):
+                            map_data[i+ofx][j+ofy] = 99
+    return map_data
 
 
